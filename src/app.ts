@@ -19,6 +19,7 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173',
       'http://localhost:3000',
+      'http://localhost:8080',
       'https://herocodeai.vercel.app',
       'https://herocode-h4m0mctc1-knanqafaros-projects.vercel.app'
     ],
