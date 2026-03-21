@@ -56,7 +56,7 @@ export class XpService {
     if (!user) throw new Error('User tapılmadı');
 
     const bonus = Math.floor(user.level * 20); // məsələn hər level üçün +20 XP
-    return this.addXp(userId, baseXp + bonus);
+    return this.addXp(userId, baseXp + bonus) as Promise<{ user: any; levelUp: boolean }>;
   }
 
   /**
@@ -64,7 +64,7 @@ export class XpService {
    */
   static async awardTaskComplete(userId: string, difficulty: 'easy' | 'medium' | 'hard' = 'medium'): Promise<{ user: any; levelUp: boolean }> {
     const xpMap = { easy: 150, medium: 300, hard: 600 };
-    return this.addXp(userId, xpMap[difficulty]);
+    return this.addXp(userId, xpMap[difficulty]) as Promise<{ user: any; levelUp: boolean }>;
   }
 
   /**
