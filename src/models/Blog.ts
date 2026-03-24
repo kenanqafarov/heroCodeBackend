@@ -4,6 +4,7 @@ export interface IBlog extends Document {
   title: string;
   excerpt: string;
   content: string;
+  coverImage: string;
   author: {
     _id: string;
     username: string;
@@ -23,37 +24,42 @@ export interface IBlog extends Document {
   updatedAt: Date;
 }
 
-const blogSchema = new Schema<IBlog>({
-  title: { type: String, required: true, trim: true },
-  excerpt: { type: String, required: true, trim: true },
-  content: { type: String, required: true },
-  author: {
-    _id: { type: String, required: true },
-    username: { type: String, required: true },
-    email: { type: String, required: true }
+const blogSchema = new Schema<IBlog>(
+  {
+    title: { type: String, required: true, trim: true },
+    excerpt: { type: String, required: true, trim: true },
+    content: { type: String, required: true },
+    coverImage: { type: String, default: '' },
+    author: {
+      _id: { type: String, required: true },
+      username: { type: String, required: true },
+      email: { type: String, required: true },
+    },
+    category: {
+      type: String,
+      enum: ['Web3', 'JavaScript', 'React', 'Advanced', 'Beginner'],
+      default: 'Beginner',
+    },
+    difficulty: {
+      type: String,
+      enum: ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
+      default: 'Beginner',
+    },
+    tags: [{ type: String, trim: true }],
+    reads: { type: Number, default: 0 },
+    likes: [{ type: String }],
+    comments: [
+      {
+        user: String,
+        text: String,
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
-  category: {
-    type: String,
-    enum: ['Web3', 'JavaScript', 'React', 'Advanced', 'Beginner'],
-    default: 'Beginner'
-  },
-  difficulty: {
-    type: String,
-    enum: ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
-    default: 'Beginner'
-  },
-  tags: [{ type: String, trim: true }],
-  reads: { type: Number, default: 0 },
-  likes: [{ type: String }],
-  comments: [
-    {
-      user: String,
-      text: String,
-      createdAt: { type: Date, default: Date.now }
-    }
-  ],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
+  { timestamps: true }
+);
+
+// Full-text search index
+blogSchema.index({ title: 'text', excerpt: 'text' });
 
 export default model<IBlog>('Blog', blogSchema);

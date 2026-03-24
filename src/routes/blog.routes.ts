@@ -7,17 +7,17 @@ import {
   updateBlog,
   deleteBlog,
   likeBlog,
-  addComment
+  addComment,
 } from '../controllers/blog.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Public routes
+// Public
 router.get('/', getAllBlogs);
 router.get('/:id', getBlogById);
 
-// Protected routes
+// Protected
 router.post('/', protect, createBlog);
 router.get('/user/my-blogs', protect, getUserBlogs);
 router.put('/:id', protect, updateBlog);
