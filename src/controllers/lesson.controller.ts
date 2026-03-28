@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User, { IUser, KnowledgeProfile } from '../models/User';
+import Module from '../models/Module';
 import { AuthRequest } from '../middleware/auth.middleware';
 import {
   generatePersonalizedModule,
@@ -16,24 +17,48 @@ export const getLessonModules = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(req.user!.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Available modules in the system
-    const availableModules = [
-      { id: 'javascript-basics', title: 'JavaScript Fundamentals', difficulty: 'beginner', estimatedTime: 60 },
-      { id: 'react-basics', title: 'React Essentials', difficulty: 'intermediate', estimatedTime: 90 },
-      { id: 'typescript-advanced', title: 'TypeScript Mastery', difficulty: 'advanced', estimatedTime: 120 },
-      { id: 'node-backend', title: 'Node.js Backend Development', difficulty: 'intermediate', estimatedTime: 100 },
-      { id: 'web-performance', title: 'Web Performance Optimization', difficulty: 'advanced', estimatedTime: 80 },
-      { id: 'database-design', title: 'Database Design & SQL', difficulty: 'intermediate', estimatedTime: 90 },
-      { id: 'web3-intro', title: 'Web3 & Smart Contracts', difficulty: 'advanced', estimatedTime: 110 },
+    // Get modules from database (admin-created) and built-in modules
+    const dbModules = await Module.find().select('_id title language difficulty description tags').lean();
+    
+    // Combine with built-in modules
+    const builtInModules = [
+      { id: 'javascript-basics', _id: 'javascript-basics', title: 'JavaScript Fundamentals', difficulty: 'beginner', estimatedTime: 60, language: 'JavaScript' },
+      { id: 'react-basics', _id: 'react-basics', title: 'React Essentials', difficulty: 'intermediate', estimatedTime: 90, language: 'JavaScript' },
+      { id: 'typescript-advanced', _id: 'typescript-advanced', title: 'TypeScript Mastery', difficulty: 'advanced', estimatedTime: 120, language: 'TypeScript' },
+      { id: 'node-backend', _id: 'node-backend', title: 'Node.js Backend Development', difficulty: 'intermediate', estimatedTime: 100, language: 'JavaScript' },
+      { id: 'web-performance', _id: 'web-performance', title: 'Web Performance Optimization', difficulty: 'advanced', estimatedTime: 80, language: 'JavaScript' },
+      { id: 'database-design', _id: 'database-design', title: 'Database Design & SQL', difficulty: 'intermediate', estimatedTime: 90, language: 'SQL' },
+      { id: 'web3-intro', _id: 'web3-intro', title: 'Web3 & Smart Contracts', difficulty: 'advanced', estimatedTime: 110, language: 'Solidity' },
+    ];
+
+    // Merge database modules with built-in ones
+    const allModules = [
+      ...dbModules.map(mod => ({
+        id: (mod as any)._id.toString(),
+        _id: (mod as any)._id.toString(),
+        title: (mod as any).title,
+        difficulty: (mod as any).difficulty,
+        language: (mod as any).language,
+        description: (mod as any).description,
+        isCustom: true
+      })),
+      ...builtInModules
     ];
 
     const moduleProgressMap = user.moduleProgress as unknown as Map<string, any>;
 
-    const modulesList = availableModules.map(mod => {
-      const progress = moduleProgressMap?.get(mod.id);
+    const modulesList = allModules.map((mod: any) => {
+      const progress = moduleProgressMap?.get(mod.id || mod._id);
+      const moduleId = mod.id || mod._id;
+      
       return {
-        ...mod,
-        isLocked: !user.unlockedModules.includes(mod.id),
+        id: moduleId,
+        title: mod.title,
+        difficulty: mod.difficulty,
+        language: mod.language || 'JavaScript',
+        description: mod.description || '',
+        isLocked: !user.unlockedModules.includes(moduleId),
+        isCustom: mod.isCustom || false,
         progress: progress
           ? Math.round((progress.unitsCompleted.length / 5) * 100)
           : 0,
@@ -174,21 +199,30 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
     knowledgeProfile.weakTopics = [...new Set(weakTopics)];
     knowledgeProfileMap.set(moduleId, knowledgeProfile);
 
-    // Generate personalized module
-    let module;
-    try {
-      module = await generatePersonalizedModule(
-        moduleId,
-        knowledgeProfile,
-        user.skillLevel || 'beginner'
-      );
-    } catch (error) {
-      console.warn('Personalized module generation failed, using fallback:', error);
+    // Try to fetch module from database first (admin-created modules)
+    let module = await fetchModuleFromDatabase(moduleId);
+
+    // If not found in database, generate personalized module
+    if (!module) {
+      try {
+        module = await generatePersonalizedModule(
+          moduleId,
+          knowledgeProfile,
+          user.skillLevel || 'beginner'
+        );
+      } catch (error) {
+        console.warn('Personalized module generation failed, using fallback:', error);
+        module = generateFallbackModule(moduleId);
+      }
+    }
+
+    // Ensure module has valid structure - always set to fallback if invalid
+    if (!module || !module.units || module.units.length === 0) {
       module = generateFallbackModule(moduleId);
     }
 
-    // Ensure module has valid structure
-    if (!module || !module.units || module.units.length === 0) {
+    // Ensure module is never null at this point
+    if (!module) {
       module = generateFallbackModule(moduleId);
     }
 
@@ -404,6 +438,172 @@ function calculateStars(score: number, timeTaken: number): number {
   return 0;
 }
 
+// ============ MODULE CONVERSION FUNCTIONS ============
+
+/**
+ * Fetch module from MongoDB (created by admin) and convert to lesson format
+ */
+async function fetchModuleFromDatabase(moduleId: string) {
+  try {
+    // Try to find by MongoDB _id
+    let module = await Module.findById(moduleId).lean();
+    
+    // If not found by _id, try to find by title or other identifier
+    if (!module) {
+      module = await Module.findOne({ 
+        $or: [
+          { title: new RegExp(moduleId, 'i') },
+          { _id: moduleId }
+        ]
+      }).lean();
+    }
+
+    if (!module) return null;
+
+    // Convert Module format to Lesson format
+    return convertModuleToLesson(module);
+  } catch (error) {
+    console.error('Error fetching module from database:', error);
+    return null;
+  }
+}
+
+/**
+ * Convert Module document to Lesson format
+ */
+function convertModuleToLesson(moduleDoc: any) {
+  const units = [];
+  
+  // Create main unit with the module content
+  const mainUnit = {
+    unitId: 1,
+    title: moduleDoc.title || 'Lesson Unit',
+    difficulty: getDifficultyNumber(moduleDoc.difficulty),
+    narrative: `You are learning ${moduleDoc.title}. This is an essential skill in ${moduleDoc.language}.`,
+    theory: {
+      title: moduleDoc.title,
+      content: moduleDoc.content || '',
+      keyPoints: extractKeyPoints(moduleDoc.content),
+      codeExamples: extractCodeExamples(moduleDoc.content),
+      analogies: `Learn ${moduleDoc.title} through practical examples and interactive challenges.`
+    },
+    interactiveContent: {
+      type: 'code-challenge',
+      description: `Complete the ${moduleDoc.title} challenge`
+    },
+    quiz: {
+      questions: (moduleDoc.questions || []).map((q: any, idx: number) => ({
+        id: `q${idx + 1}`,
+        question: q.question,
+        type: 'multiple-choice',
+        options: q.options,
+        correctAnswer: q.options[q.correctAnswer] || q.correctAnswer,
+        explanation: q.explanation,
+        difficulty: getDifficultyNumber(moduleDoc.difficulty)
+      })),
+      passingScore: 70,
+      timeLimit: 600
+    }
+  };
+
+  units.push(mainUnit);
+
+  // Create additional unit from summary if needed
+  if (moduleDoc.tags && moduleDoc.tags.length > 0) {
+    const summaryUnit = {
+      unitId: 2,
+      title: `${moduleDoc.title} - Practice`,
+      difficulty: getDifficultyNumber(moduleDoc.difficulty),
+      narrative: `Now let's practice what you've learned about ${moduleDoc.title}!`,
+      theory: {
+        title: 'Practice & Review',
+        content: `Key topics: ${moduleDoc.tags.join(', ')}`,
+        keyPoints: moduleDoc.tags,
+        codeExamples: [],
+        analogies: 'Apply your knowledge in real-world scenarios'
+      },
+      interactiveContent: {
+        type: 'practice-exercise',
+        description: 'Solve real-world problems'
+      },
+      quiz: {
+        questions: (moduleDoc.questions || []).map((q: any, idx: number) => ({
+          id: `practice_q${idx + 1}`,
+          question: `Practice: ${q.question}`,
+          type: 'multiple-choice',
+          options: q.options,
+          correctAnswer: q.options[q.correctAnswer] || q.correctAnswer,
+          explanation: q.explanation,
+          difficulty: getDifficultyNumber(moduleDoc.difficulty)
+        })),
+        passingScore: 75,
+        timeLimit: 900
+      }
+    };
+    units.push(summaryUnit);
+  }
+
+  return {
+    moduleId: moduleDoc._id?.toString() || moduleDoc.id,
+    title: moduleDoc.title,
+    language: moduleDoc.language,
+    difficulty: moduleDoc.difficulty,
+    totalUnits: units.length,
+    units,
+    battleInfo: {
+      enemyName: `${moduleDoc.title} Master`,
+      enemyDescription: `A skilled expert in ${moduleDoc.title} who will test your knowledge`
+    }
+  };
+}
+
+/**
+ * Extract key points from content (markdown/HTML)
+ */
+function extractKeyPoints(content: string): string[] {
+  if (!content) return [];
+  
+  const lines = content.split('\n');
+  const keyPoints: string[] = [];
+  
+  lines.forEach(line => {
+    // Extract headers (##, ###) and bullet points
+    if (line.match(/^#+\s/) || line.match(/^-\s/) || line.match(/^\*/)) {
+      const cleaned = line.replace(/^#+\s|^-\s|^\*\s/, '').trim();
+      if (cleaned && !cleaned.startsWith('http') && keyPoints.length < 5) {
+        keyPoints.push(cleaned);
+      }
+    }
+  });
+
+  return keyPoints.length > 0 ? keyPoints : ['Core concepts', 'Practical application', 'Best practices'];
+}
+
+/**
+ * Extract code examples from content
+ */
+function extractCodeExamples(content: string): string[] {
+  if (!content) return [];
+  
+  const codeBlocks: string[] = [];
+  const regex = /```[\s\S]*?```/g;
+  const matches = content.match(regex);
+  
+  return matches ? matches.slice(0, 3) : [];
+}
+
+/**
+ * Convert difficulty string to number
+ */
+function getDifficultyNumber(difficulty: string): number {
+  const map: { [key: string]: number } = {
+    'beginner': 1,
+    'intermediate': 5,
+    'advanced': 9
+  };
+  return map[difficulty?.toLowerCase()] || 5;
+}
+
 // Fallback functions when Gemini fails
 function generateFallbackPreQuiz(moduleId: string) {
   return {
@@ -429,6 +629,8 @@ function generateFallbackModule(moduleId: string) {
   return {
     moduleId,
     title: `Learn ${moduleId}`,
+    language: 'JavaScript',
+    difficulty: 'intermediate',
     totalUnits: 5,
     units: Array.from({ length: 5 }, (_, i) => generateFallbackUnit(i + 1)),
     battleInfo: {
