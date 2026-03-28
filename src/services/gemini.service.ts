@@ -109,8 +109,11 @@ export async function generatePersonalizedModule(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const apiKey = process.env.GEMINI_API_KEY ?? '';
+    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     const systemPrompt = generateModuleSystemPrompt(moduleKey, knowledgeProfile, userSkillLevel);
 
@@ -165,8 +168,11 @@ export async function generatePreQuiz(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const apiKey = process.env.GEMINI_API_KEY ?? '';
+    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     const systemPrompt = `You are an expert assessment AI for HeroCode: The Logical Dungeon.
 
@@ -235,8 +241,11 @@ export async function generateAdaptiveUnit(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' });
+    const apiKey = process.env.GEMINI_API_KEY ?? '';
+    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
 
     const difficulty = calculateAdaptiveDifficulty(previousUnitScore, knowledgeProfile);
 
@@ -319,17 +328,14 @@ function calculateAdaptiveDifficulty(
   previousScore: number,
   knowledgeProfile: Partial<KnowledgeProfile>
 ): number {
-  let baseDifficulty = 5; // Start at medium (1-10 scale)
+  let baseDifficulty = 5;
 
-  // Adjust based on previous performance
   if (previousScore > 85) baseDifficulty += 2;
   else if (previousScore < 60) baseDifficulty -= 1;
 
-  // Adjust based on learning style and pace
   if (knowledgeProfile.adaptationData?.preferredPace === 'fast') baseDifficulty += 1;
   if (knowledgeProfile.adaptationData?.preferredPace === 'slow') baseDifficulty -= 1;
 
-  // Clamp to 1-10
   return Math.max(1, Math.min(10, baseDifficulty));
 }
 
@@ -341,7 +347,6 @@ function enrichModuleData(moduleData: any, moduleKey: string): any {
     moduleData.units = [];
   }
 
-  // Ensure each unit has required fields
   moduleData.units = moduleData.units.map((unit: any, index: number) => ({
     unitId: unit.unitId || index + 1,
     title: unit.title || `Unit ${index + 1}`,
