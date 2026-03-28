@@ -112,6 +112,10 @@ export async function generatePersonalizedModule(
     const apiKey: string = process.env.GEMINI_API_KEY ?? '';
     const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
 
@@ -142,7 +146,7 @@ export async function generatePersonalizedModule(
     }
 
     // Parse JSON response (Gemini should return pure JSON)
-    let moduleData = JSON.parse(content.text);
+    let moduleData = JSON.parse(content.text as string);
 
     // Ensure moduleId is set
     if (!moduleData.moduleId) {
@@ -170,6 +174,10 @@ export async function generatePreQuiz(
   try {
     const apiKey: string = process.env.GEMINI_API_KEY ?? '';
     const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -221,7 +229,7 @@ Generate 5-8 questions that:
       throw new Error('Invalid response from Gemini API');
     }
 
-    const quizData = JSON.parse(content.text);
+    const quizData = JSON.parse(content.text as string);
     return quizData;
   } catch (error) {
     console.error('Pre-quiz generation error:', error);
@@ -243,6 +251,10 @@ export async function generateAdaptiveUnit(
   try {
     const apiKey: string = process.env.GEMINI_API_KEY ?? '';
     const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -313,7 +325,7 @@ Notes:
       throw new Error('Invalid response from Gemini API');
     }
 
-    const unitData = JSON.parse(content.text);
+    const unitData = JSON.parse(content.text as string);
     return unitData;
   } catch (error) {
     console.error('Adaptive unit generation error:', error);
