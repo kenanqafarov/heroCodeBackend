@@ -130,23 +130,30 @@ export const startModule = async (req: AuthRequest, res: Response) => {
 export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
   try {
     const { moduleId } = req.params;
-    const { answers, sessionId } = req.body;
+    const { answers = {} } = req.body;
 
     const user = await User.findById(req.user!.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Calculate pre-quiz score
-    const preQuiz = await generatePreQuiz(moduleId, user.skillLevel || 'beginner');
     let score = 0;
     const weakTopics: string[] = [];
 
-    preQuiz.questions.forEach((q: any) => {
-      if (answers[q.id] === q.correctAnswer) {
-        score += 100 / preQuiz.questions.length;
-      } else {
-        if (q.topic) weakTopics.push(q.topic);
+    // Only score if answers provided
+    if (Object.keys(answers).length > 0) {
+      try {
+        const preQuiz = await generatePreQuiz(moduleId, user.skillLevel || 'beginner');
+        preQuiz.questions.forEach((q: any) => {
+          if (answers[q.id] === q.correctAnswer) {
+            score += 100 / preQuiz.questions.length;
+          } else {
+            if (q.topic) weakTopics.push(q.topic);
+          }
+        });
+      } catch (quizError) {
+        console.warn('Failed to score pre-quiz:', quizError);
+        // Continue with default score
       }
-    });
+    }
 
     const knowledgeProfileMap = user.knowledgeProfile as unknown as Map<string, any>;
 
@@ -167,7 +174,7 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
     knowledgeProfile.weakTopics = [...new Set(weakTopics)];
     knowledgeProfileMap.set(moduleId, knowledgeProfile);
 
-    // Generate personalized module using Gemini
+    // Generate personalized module
     let module;
     try {
       module = await generatePersonalizedModule(
@@ -176,7 +183,12 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
         user.skillLevel || 'beginner'
       );
     } catch (error) {
-      console.warn('Gemini generation failed, using fallback module');
+      console.warn('Personalized module generation failed, using fallback:', error);
+      module = generateFallbackModule(moduleId);
+    }
+
+    // Ensure module has valid structure
+    if (!module || !module.units || module.units.length === 0) {
       module = generateFallbackModule(moduleId);
     }
 
