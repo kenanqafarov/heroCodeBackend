@@ -1,5 +1,27 @@
 import { Schema, model, Document } from 'mongoose';
 
+// Gamified Learning System Types
+export interface KnowledgeProfile {
+  knownTopics: string[];
+  weakTopics: string[];
+  lastQuizScore: number;
+  adaptationData: {
+    preferredPace?: 'slow' | 'medium' | 'fast';
+    learningStyle?: 'visual' | 'textual' | 'interactive';
+    difficultyMultiplier?: number;
+    mistakesCount?: number;
+  };
+}
+
+export interface ModuleProgress {
+  currentUnit: number;
+  unitsCompleted: number[];
+  totalXP: number;
+  stars: { [level: number]: number };
+  timeSpent: number; // in milliseconds
+  completedAt?: Date;
+}
+
 export interface IUser extends Document {
   email: string;
   password: string;
@@ -20,9 +42,35 @@ export interface IUser extends Document {
     clothingColor: string;
     username?: string;
   };
+  // New Gamified Learning Fields
+  knowledgeProfile: { [moduleKey: string]: KnowledgeProfile };
+  moduleProgress: { [moduleId: string]: ModuleProgress };
+  unlockedModules: string[];
+  totalLessonXP: number;
   isAdmin: boolean;
   createdAt: Date;
 }
+
+const knowledgeProfileSchema = new Schema({
+  knownTopics: [String],
+  weakTopics: [String],
+  lastQuizScore: { type: Number, default: 0 },
+  adaptationData: {
+    preferredPace: { type: String, enum: ['slow', 'medium', 'fast'], default: 'medium' },
+    learningStyle: { type: String, enum: ['visual', 'textual', 'interactive'], default: 'interactive' },
+    difficultyMultiplier: { type: Number, default: 1 },
+    mistakesCount: { type: Number, default: 0 }
+  }
+}, { _id: false });
+
+const moduleProgressSchema = new Schema({
+  currentUnit: { type: Number, default: 0 },
+  unitsCompleted: [Number],
+  totalXP: { type: Number, default: 0 },
+  stars: { type: Map, of: Number, default: new Map() },
+  timeSpent: { type: Number, default: 0 },
+  completedAt: Date
+}, { _id: false });
 
 const userSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -44,6 +92,11 @@ const userSchema = new Schema<IUser>({
     clothingColor: { type: String, default: '#3b82f6' },
     username: String
   },
+  // Gamified Learning System Fields
+  knowledgeProfile: { type: Map, of: knowledgeProfileSchema, default: new Map() },
+  moduleProgress: { type: Map, of: moduleProgressSchema, default: new Map() },
+  unlockedModules: { type: [String], default: ['javascript-basics', 'web-development'] },
+  totalLessonXP: { type: Number, default: 0 },
   isAdmin: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });

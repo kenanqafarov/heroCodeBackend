@@ -7,22 +7,22 @@ import {
   updateBlog,
   deleteBlog,
   likeBlog,
-  addComment,
+  addCommentOrReply,
 } from '../controllers/blog.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Public
+// Public routes
 router.get('/', getAllBlogs);
 router.get('/:id', getBlogById);
 
-// Protected
+// Protected routes
 router.post('/', protect, createBlog);
 router.get('/user/my-blogs', protect, getUserBlogs);
 router.put('/:id', protect, updateBlog);
 router.delete('/:id', protect, deleteBlog);
 router.post('/:id/like', protect, likeBlog);
-router.post('/:id/comment', protect, addComment);
+router.post('/:id/comment', protect, addCommentOrReply);   // həm comment, həm reply üçün
 
 export default router;

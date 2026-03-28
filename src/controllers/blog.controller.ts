@@ -61,7 +61,7 @@ export const getAllBlogs = async (req: Request, res: Response) => {
       ];
     }
     if (category) query.category = category;
-    if (tag) query.tags = tag;
+    if (tag) query.tags = { $in: [tag] };
 
     const [blogs, total] = await Promise.all([
       Blog.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -183,23 +183,60 @@ export const likeBlog = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// ─── Add Comment ───────────────────────────────────────────────────────────────
-export const addComment = async (req: AuthRequest, res: Response) => {
+// ─── Add Comment or Reply (Nested) ─────────────────────────────────────────────
+export const addCommentOrReply = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    const { text } = req.body;
+    const { text, parentId } = req.body;
     if (!text?.trim()) return res.status(400).json({ success: false, message: 'Comment text is required' });
 
     const blog = await Blog.findById(req.params.id);
     if (!blog) return res.status(404).json({ success: false, message: 'Blog not found' });
 
     const user = await User.findById(userId);
-    blog.comments.push({ user: user?.username || 'Anonymous', text: text.trim(), createdAt: new Date() });
+    const username = user?.username || 'Anonymous';
+
+    const newComment: any = {
+      user: username,
+      userId,
+      text: text.trim(),
+      createdAt: new Date(),
+      replies: [],
+    };
+
+    if (!parentId) {
+      // Əsas comment
+      blog.comments.push(newComment);
+    } else {
+      // Reply əlavə et (recursive)
+      const addReply = (comments: any[]): boolean => {
+        for (const comment of comments) {
+          if (comment._id.toString() === parentId) {
+            comment.replies.push(newComment);
+            return true;
+          }
+          if (comment.replies && addReply(comment.replies)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const added = addReply(blog.comments);
+      if (!added) {
+        return res.status(404).json({ success: false, message: 'Parent comment not found' });
+      }
+    }
+
     await blog.save();
 
-    res.json({ success: true, message: 'Comment added', data: blog.comments });
+    res.json({
+      success: true,
+      message: parentId ? 'Reply added successfully' : 'Comment added successfully',
+      data: blog.comments,
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
   }

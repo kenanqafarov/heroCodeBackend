@@ -1,4 +1,14 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
+
+export interface IComment {
+  _id: Types.ObjectId;
+  user: string;
+  userId?: string;
+  text: string;
+  createdAt: Date;
+  parentId?: Types.ObjectId | null;
+  replies: IComment[];
+}
 
 export interface IBlog extends Document {
   title: string;
@@ -15,14 +25,22 @@ export interface IBlog extends Document {
   tags: string[];
   reads: number;
   likes: string[];
-  comments: Array<{
-    user: string;
-    text: string;
-    createdAt: Date;
-  }>;
+  comments: IComment[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const commentSchema = new Schema<IComment>(
+  {
+    user: { type: String, required: true },
+    userId: { type: String },
+    text: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    parentId: { type: Schema.Types.ObjectId, default: null },
+    replies: [{ type: Schema.Types.Mixed }], // recursive nested replies
+  },
+  { _id: true }
+);
 
 const blogSchema = new Schema<IBlog>(
   {
@@ -48,13 +66,7 @@ const blogSchema = new Schema<IBlog>(
     tags: [{ type: String, trim: true }],
     reads: { type: Number, default: 0 },
     likes: [{ type: String }],
-    comments: [
-      {
-        user: String,
-        text: String,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+    comments: [commentSchema],
   },
   { timestamps: true }
 );
