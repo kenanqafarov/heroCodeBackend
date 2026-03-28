@@ -22,6 +22,11 @@ export interface ModuleProgress {
   completedAt?: Date;
 }
 
+export interface LearnedLanguage {
+  language: string;
+  level: 'beginner' | 'intermediate' | 'advanced';
+}
+
 export interface IUser extends Document {
   email: string;
   password: string;
@@ -47,6 +52,7 @@ export interface IUser extends Document {
   moduleProgress: { [moduleId: string]: ModuleProgress };
   unlockedModules: string[];
   totalLessonXP: number;
+  learnedLanguages: LearnedLanguage[];
   isAdmin: boolean;
   createdAt: Date;
 }
@@ -97,6 +103,10 @@ const userSchema = new Schema<IUser>({
   moduleProgress: { type: Map, of: moduleProgressSchema, default: new Map() },
   unlockedModules: { type: [String], default: ['javascript-basics', 'web-development'] },
   totalLessonXP: { type: Number, default: 0 },
+  learnedLanguages: [{
+    language: { type: String, required: true },
+    level: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'beginner' }
+  }],
   isAdmin: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now }
 });

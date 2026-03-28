@@ -13,6 +13,28 @@ export const getMe = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const updateMe = async (req: AuthRequest, res: Response) => {
+  try {
+    const { learnedLanguages, xp } = req.body;
+
+    const user = await User.findById(req.user!.id);
+    if (!user) return res.status(404).json({ success: false, message: 'İstifadəçi tapılmadı' });
+
+    if (learnedLanguages !== undefined) {
+      user.learnedLanguages = learnedLanguages;
+    }
+    if (typeof xp === 'number') {
+      user.xp = xp;
+    }
+
+    await user.save();
+
+    res.json({ success: true, data: user });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 export const updateCharacter = async (req: AuthRequest, res: Response) => {
   try {
     const { gender, emotion, clothing, hairColor, skin, clothingColor, username } = req.body;

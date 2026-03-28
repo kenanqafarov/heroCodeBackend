@@ -9,6 +9,7 @@ import matchmakingRoutes from './routes/matchmaking.routes';
 import adminRoutes from './routes/admin.routes';
 import blogRoutes from './routes/blog.routes';
 import lessonRoutes from './routes/lesson.routes';
+import moduleRoutes from './routes/module.routes';
 import { matchmakingSocket } from './sockets/matchmaking.socket';
 import { protect } from './middleware/auth.middleware';
 import jwt from 'jsonwebtoken';
@@ -56,6 +57,7 @@ app.use('/api/matchmaking', protect, matchmakingRoutes);
 app.use('/api/admin', protect, adminRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/lesson-modules', lessonRoutes);
+app.use('/api/modules', moduleRoutes);
 
 // Socket.IO middleware (token yoxlama)
 io.use((socket, next) => {
