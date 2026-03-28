@@ -72,9 +72,9 @@ export const startModule = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(req.user!.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Check if module is unlocked
+    // Auto-unlock module if not already unlocked
     if (!user.unlockedModules.includes(moduleId)) {
-      return res.status(403).json({ success: false, message: 'Module is locked' });
+      user.unlockedModules.push(moduleId);
     }
 
     const knowledgeProfileMap = user.knowledgeProfile as unknown as Map<string, any>;
