@@ -109,8 +109,8 @@ export async function generatePersonalizedModule(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY ?? '';
-    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+    const apiKey: string = process.env.GEMINI_API_KEY ?? '';
+    const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -168,8 +168,8 @@ export async function generatePreQuiz(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY ?? '';
-    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+    const apiKey: string = process.env.GEMINI_API_KEY ?? '';
+    const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -241,8 +241,8 @@ export async function generateAdaptiveUnit(
   userSkillLevel: string
 ): Promise<any> {
   try {
-    const apiKey = process.env.GEMINI_API_KEY ?? '';
-    const modelName = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+    const apiKey: string = process.env.GEMINI_API_KEY ?? '';
+    const modelName: string = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
