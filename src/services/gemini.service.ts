@@ -134,7 +134,7 @@ export async function generatePersonalizedModule(
     });
 
     const content = response.response.candidates?.[0]?.content?.parts?.[0];
-    if (!content || content.type !== 'text') {
+    if (!content || !('text' in content)) {
       throw new Error('Invalid response from Gemini API');
     }
 
@@ -211,7 +211,7 @@ Generate 5-8 questions that:
     });
 
     const content = response.response.candidates?.[0]?.content?.parts?.[0];
-    if (!content || content.type !== 'text') {
+    if (!content || !('text' in content)) {
       throw new Error('Invalid response from Gemini API');
     }
 
@@ -300,7 +300,7 @@ Notes:
     });
 
     const content = response.response.candidates?.[0]?.content?.parts?.[0];
-    if (!content || content.type !== 'text') {
+    if (!content || !('text' in content)) {
       throw new Error('Invalid response from Gemini API');
     }
 

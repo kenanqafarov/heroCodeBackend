@@ -48,7 +48,7 @@ export const getLessonModules = async (req: AuthRequest, res: Response) => {
         availableModules: modulesList,
         unlockedModules: user.unlockedModules,
         totalLessonXP: user.totalLessonXP || 0,
-        moduleProgress: Object.fromEntries(user.moduleProgress || new Map())
+        moduleProgress: Object.fromEntries(user.moduleProgress?.entries() || [])
       }
     });
   } catch (error: any) {
@@ -79,12 +79,12 @@ export const startModule = async (req: AuthRequest, res: Response) => {
         weakTopics: [],
         lastQuizScore: 0,
         adaptationData: {
-          preferredPace: 'medium',
-          learningStyle: 'interactive',
+          preferredPace: 'medium' as const,
+          learningStyle: 'interactive' as const,
           difficultyMultiplier: 1,
           mistakesCount: 0
         }
-      });
+      } as any);
     }
 
     // Generate pre-quiz using Gemini
@@ -147,16 +147,16 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
       weakTopics: [],
       lastQuizScore: 0,
       adaptationData: {
-        preferredPace: 'medium',
-        learningStyle: 'interactive',
+        preferredPace: 'medium' as const,
+        learningStyle: 'interactive' as const,
         difficultyMultiplier: 1,
         mistakesCount: 0
       }
-    };
+    } as any;
 
     knowledgeProfile.lastQuizScore = Math.round(score);
     knowledgeProfile.weakTopics = [...new Set(weakTopics)];
-    user.knowledgeProfile.set(moduleId, knowledgeProfile);
+    user.knowledgeProfile.set(moduleId, knowledgeProfile as any);
 
     // Generate personalized module using Gemini
     let module;
@@ -178,6 +178,7 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
       totalXP: 0,
       stars: new Map(),
       timeSpent: 0
+    } as any);
     });
 
     await user.save();
@@ -220,7 +221,7 @@ export const submitUnitQuiz = async (req: AuthRequest, res: Response) => {
       totalXP: 0,
       stars: new Map(),
       timeSpent: 0
-    };
+    } as any;
 
     moduleProgress.totalXP += xpEarned;
     moduleProgress.timeSpent += timeTaken;
@@ -231,17 +232,17 @@ export const submitUnitQuiz = async (req: AuthRequest, res: Response) => {
     const starsEarned = calculateStars(score, timeTaken);
     moduleProgress.stars.set(Number(unitId), starsEarned);
 
-    user.moduleProgress.set(moduleId, moduleProgress);
+    user.moduleProgress.set(moduleId, moduleProgress as any);
     user.totalLessonXP = (user.totalLessonXP || 0) + xpEarned;
 
     // Update knowledge profile for adaptivity
-    const knowledgeProfile = user.knowledgeProfile.get(moduleId);
+    const knowledgeProfile = user.knowledgeProfile.get(moduleId) as any;
     if (knowledgeProfile) {
       knowledgeProfile.lastQuizScore = score;
       if (score < 60) {
         knowledgeProfile.adaptationData.mistakesCount++;
       }
-      user.knowledgeProfile.set(moduleId, knowledgeProfile);
+      user.knowledgeProfile.set(moduleId, knowledgeProfile as any);
     }
 
     // Generate next unit adaptively or prepare battle
@@ -299,7 +300,7 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(req.user!.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const moduleProgress = user.moduleProgress.get(moduleId);
+    const moduleProgress = user.moduleProgress.get(moduleId) as any;
     if (!moduleProgress) return res.status(400).json({ success: false, message: 'Module not started' });
 
     if (!won) {
@@ -335,7 +336,7 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    user.moduleProgress.set(moduleId, moduleProgress);
+    user.moduleProgress.set(moduleId, moduleProgress as any);
     await user.save();
 
     res.json({
