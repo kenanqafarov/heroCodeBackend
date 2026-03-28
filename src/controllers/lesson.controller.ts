@@ -179,7 +179,6 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
       stars: new Map(),
       timeSpent: 0
     } as any);
-    });
 
     await user.save();
 
