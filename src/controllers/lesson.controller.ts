@@ -27,20 +27,25 @@ export const getLessonModules = async (req: AuthRequest, res: Response) => {
       { id: 'web3-intro', title: 'Web3 & Smart Contracts', difficulty: 'advanced', estimatedTime: 110 },
     ];
 
-    const modulesList = availableModules.map(mod => ({
-      ...mod,
-      isLocked: !user.unlockedModules.includes(mod.id),
-      progress: user.moduleProgress?.get(mod.id)
-        ? Math.round((user.moduleProgress.get(mod.id)!.unitsCompleted.length / 5) * 100)
-        : 0,
-      userStats: user.moduleProgress?.get(mod.id)
-        ? {
-          bestScore: 0, // Would aggregate from quiz submissions
-          attempts: user.moduleProgress.get(mod.id)!.unitsCompleted.length || 0,
-          timeSpent: user.moduleProgress.get(mod.id)!.timeSpent || 0
-        }
-        : undefined
-    }));
+    const moduleProgressMap = user.moduleProgress as unknown as Map<string, any>;
+
+    const modulesList = availableModules.map(mod => {
+      const progress = moduleProgressMap?.get(mod.id);
+      return {
+        ...mod,
+        isLocked: !user.unlockedModules.includes(mod.id),
+        progress: progress
+          ? Math.round((progress.unitsCompleted.length / 5) * 100)
+          : 0,
+        userStats: progress
+          ? {
+            bestScore: 0,
+            attempts: progress.unitsCompleted.length || 0,
+            timeSpent: progress.timeSpent || 0
+          }
+          : undefined
+      };
+    });
 
     res.json({
       success: true,
@@ -48,7 +53,7 @@ export const getLessonModules = async (req: AuthRequest, res: Response) => {
         availableModules: modulesList,
         unlockedModules: user.unlockedModules,
         totalLessonXP: user.totalLessonXP || 0,
-        moduleProgress: Object.fromEntries(user.moduleProgress?.entries() || [])
+        moduleProgress: Object.fromEntries((moduleProgressMap as Map<string, any>)?.entries() || [])
       }
     });
   } catch (error: any) {
@@ -72,9 +77,11 @@ export const startModule = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ success: false, message: 'Module is locked' });
     }
 
+    const knowledgeProfileMap = user.knowledgeProfile as unknown as Map<string, any>;
+
     // Initialize knowledge profile if doesn't exist
-    if (!user.knowledgeProfile.has(moduleId)) {
-      user.knowledgeProfile.set(moduleId, {
+    if (!knowledgeProfileMap.has(moduleId)) {
+      knowledgeProfileMap.set(moduleId, {
         knownTopics: [],
         weakTopics: [],
         lastQuizScore: 0,
@@ -84,7 +91,7 @@ export const startModule = async (req: AuthRequest, res: Response) => {
           difficultyMultiplier: 1,
           mistakesCount: 0
         }
-      } as any);
+      });
     }
 
     // Generate pre-quiz using Gemini
@@ -107,7 +114,7 @@ export const startModule = async (req: AuthRequest, res: Response) => {
       data: {
         preQuiz,
         sessionId,
-        knowledgeProfile: user.knowledgeProfile.get(moduleId)
+        knowledgeProfile: knowledgeProfileMap.get(moduleId)
       }
     });
   } catch (error: any) {
@@ -141,8 +148,10 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
       }
     });
 
+    const knowledgeProfileMap = user.knowledgeProfile as unknown as Map<string, any>;
+
     // Update knowledge profile
-    const knowledgeProfile = user.knowledgeProfile.get(moduleId) || {
+    const knowledgeProfile = knowledgeProfileMap.get(moduleId) || {
       knownTopics: [],
       weakTopics: [],
       lastQuizScore: 0,
@@ -152,11 +161,11 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
         difficultyMultiplier: 1,
         mistakesCount: 0
       }
-    } as any;
+    };
 
     knowledgeProfile.lastQuizScore = Math.round(score);
     knowledgeProfile.weakTopics = [...new Set(weakTopics)];
-    user.knowledgeProfile.set(moduleId, knowledgeProfile as any);
+    knowledgeProfileMap.set(moduleId, knowledgeProfile);
 
     // Generate personalized module using Gemini
     let module;
@@ -171,14 +180,16 @@ export const submitPreQuiz = async (req: AuthRequest, res: Response) => {
       module = generateFallbackModule(moduleId);
     }
 
+    const moduleProgressMap = user.moduleProgress as unknown as Map<string, any>;
+
     // Initialize module progress
-    user.moduleProgress.set(moduleId, {
+    moduleProgressMap.set(moduleId, {
       currentUnit: 0,
       unitsCompleted: [],
       totalXP: 0,
       stars: new Map(),
       timeSpent: 0
-    } as any);
+    });
 
     await user.save();
 
@@ -213,14 +224,16 @@ export const submitUnitQuiz = async (req: AuthRequest, res: Response) => {
     const score = calculateQuizScore(answers);
     const xpEarned = calculateXP(score, timeTaken);
 
+    const moduleProgressMap = user.moduleProgress as unknown as Map<string, any>;
+
     // Update module progress
-    const moduleProgress = user.moduleProgress.get(moduleId) || {
+    const moduleProgress = moduleProgressMap.get(moduleId) || {
       currentUnit: 0,
       unitsCompleted: [],
       totalXP: 0,
       stars: new Map(),
       timeSpent: 0
-    } as any;
+    };
 
     moduleProgress.totalXP += xpEarned;
     moduleProgress.timeSpent += timeTaken;
@@ -231,17 +244,19 @@ export const submitUnitQuiz = async (req: AuthRequest, res: Response) => {
     const starsEarned = calculateStars(score, timeTaken);
     moduleProgress.stars.set(Number(unitId), starsEarned);
 
-    user.moduleProgress.set(moduleId, moduleProgress as any);
+    moduleProgressMap.set(moduleId, moduleProgress);
     user.totalLessonXP = (user.totalLessonXP || 0) + xpEarned;
 
+    const knowledgeProfileMap = user.knowledgeProfile as unknown as Map<string, any>;
+
     // Update knowledge profile for adaptivity
-    const knowledgeProfile = user.knowledgeProfile.get(moduleId) as any;
+    const knowledgeProfile = knowledgeProfileMap.get(moduleId);
     if (knowledgeProfile) {
       knowledgeProfile.lastQuizScore = score;
       if (score < 60) {
         knowledgeProfile.adaptationData.mistakesCount++;
       }
-      user.knowledgeProfile.set(moduleId, knowledgeProfile as any);
+      knowledgeProfileMap.set(moduleId, knowledgeProfile);
     }
 
     // Generate next unit adaptively or prepare battle
@@ -275,7 +290,7 @@ export const submitUnitQuiz = async (req: AuthRequest, res: Response) => {
         nextUnit: !isLevelEnd ? nextUnit : null,
         battleTime: isLevelEnd,
         detailedFeedback: {
-          correctAnswers: Math.round(score / 20), // Assuming 5 questions each worth 20%
+          correctAnswers: Math.round(score / 20),
           totalQuestions: 5,
           incorrectTopics: []
         }
@@ -299,7 +314,8 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
     const user = await User.findById(req.user!.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const moduleProgress = user.moduleProgress.get(moduleId) as any;
+    const moduleProgressMap = user.moduleProgress as unknown as Map<string, any>;
+    const moduleProgress = moduleProgressMap.get(moduleId);
     if (!moduleProgress) return res.status(400).json({ success: false, message: 'Module not started' });
 
     if (!won) {
@@ -325,7 +341,7 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
     user.totalLessonXP = (user.totalLessonXP || 0) + xpEarned;
 
     // Check if module is completed
-    const isModuleComplete = moduleProgress.unitsCompleted.length >= 5; // Assuming 5-7 units
+    const isModuleComplete = moduleProgress.unitsCompleted.length >= 5;
 
     if (isModuleComplete) {
       moduleProgress.completedAt = new Date();
@@ -335,7 +351,7 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    user.moduleProgress.set(moduleId, moduleProgress as any);
+    moduleProgressMap.set(moduleId, moduleProgress);
     await user.save();
 
     res.json({
@@ -345,7 +361,7 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
         starsEarned,
         xpEarned,
         moduleProgress,
-        levelUp: user.totalLessonXP > 1000, // Simple level up logic
+        levelUp: user.totalLessonXP > 1000,
         moduleComplete: isModuleComplete,
         nextLevelUnlocked: isModuleComplete
       }
@@ -359,23 +375,17 @@ export const submitBattleResult = async (req: AuthRequest, res: Response) => {
 // ============ HELPER FUNCTIONS ============
 
 function calculateQuizScore(answers: { [key: string]: string }): number {
-  // Simplified - in production would verify against actual quiz
   const correctCount = Object.values(answers).filter(a => a === 'correct').length;
   return Math.round((correctCount / Object.keys(answers).length) * 100);
 }
 
 function calculateXP(score: number, timeTaken: number): number {
-  // Base XP from score (50-250)
   const scoreXP = 50 + (score * 2);
-  // Time bonus (faster = more XP)
   const timeBonus = Math.max(0, 300 - (timeTaken / 1000)) * 0.5;
   return Math.round(scoreXP + timeBonus);
 }
 
 function calculateStars(score: number, timeTaken: number): number {
-  // 1 star: score >= 60
-  // 2 stars: score >= 80
-  // 3 stars: score >= 90 AND quick completion
   if (score >= 90 && timeTaken < 600000) return 3;
   if (score >= 80) return 2;
   if (score >= 60) return 1;
