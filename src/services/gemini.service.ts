@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { KnowledgeProfile } from '../models/User';
 
+
+// Some changed
 // ============================================
 // SYSTEM PROMPT - This is the CRITICAL part
 // ============================================
